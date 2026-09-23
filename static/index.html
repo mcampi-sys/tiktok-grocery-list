@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grocery List</title>
+<style>
+  :root { --bg:#fafafa; --card:#fff; --ink:#1c1c1e; --muted:#8e8e93;
+          --accent:#007aff; --danger:#ff3b30; --line:#e5e5ea; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+         background:var(--bg); color:var(--ink); }
+  header { position:sticky; top:0; background:var(--card); border-bottom:1px solid var(--line);
+           padding:14px 16px; font-size:20px; font-weight:700; z-index:5; }
+  header small { display:block; font-size:12px; font-weight:400; color:var(--muted); }
+  main { max-width:640px; margin:0 auto; padding:12px 12px 40px; }
+  section { margin-bottom:20px; }
+  h2 { font-size:14px; text-transform:uppercase; letter-spacing:.06em;
+       color:var(--muted); margin:4px 2px 8px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px;
+          padding:12px; margin-bottom:8px; }
+  .row { display:flex; align-items:center; gap:8px; }
+  input[type=text], input[type=url], textarea {
+    width:100%; padding:10px 12px; font-size:16px; border:1px solid var(--line);
+    border-radius:10px; background:var(--bg); color:var(--ink); }
+  textarea { min-height:120px; font-family:ui-monospace,monospace; font-size:13px; }
+  button { font-size:16px; border:none; border-radius:10px; padding:10px 16px;
+           background:var(--accent); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.5; }
+  button.ghost { background:transparent; color:var(--accent); padding:6px 8px; }
+  button.danger { background:transparent; color:var(--danger); padding:6px 8px; }
+  .recipe .name { font-weight:600; flex:1; }
+  .recipe .meta { font-size:13px; color:var(--muted); }
+  .item .name { flex:1; font-weight:500; }
+  .item .qty { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  .item .src { font-size:12px; color:var(--muted); margin-top:2px; }
+  .item .badge { font-size:11px; color:var(--accent); border:1px solid var(--accent);
+                 border-radius:6px; padding:1px 6px; margin-left:6px; }
+  .stepper { display:flex; align-items:center; gap:2px; }
+  .stepper button { width:34px; height:34px; padding:0; font-size:20px; line-height:1;
+                    background:var(--bg); color:var(--accent);
+                    border:1px solid var(--line); border-radius:8px; }
+  .editbox { display:flex; gap:6px; margin-top:8px; }
+  .editbox input { padding:8px; font-size:15px; }
+  .editbox input.q { width:90px; } .editbox input.u { width:90px; }
+  .item .chk { width:26px; height:26px; accent-color:var(--accent); flex:none; }
+  .item.done { background:#f1f1f4; }
+  .item.done .name, .item.done .qty { text-decoration:line-through; opacity:.45; }
+  .sval { min-width:48px; text-align:center; font-weight:600; font-size:15px; }
+  .scale { margin-left:auto; }
+  .chip { display:inline-flex; align-items:center; gap:6px; background:var(--bg);
+          border:1px solid var(--line); border-radius:16px; padding:6px 8px 6px 12px;
+          font-size:14px; }
+  .chip button { background:transparent; color:var(--muted); padding:0 2px; font-size:15px; }
+  .suggest { background:transparent; color:var(--accent); border:1px dashed var(--accent);
+             font-size:14px; padding:6px 12px; }
+  #status { font-size:14px; color:var(--muted); min-height:20px; margin-top:8px; }
+  #status.err { color:var(--danger); }
+  details { margin-top:8px; }
+  summary { color:var(--accent); font-size:15px; cursor:pointer; padding:6px 2px; }
+  .empty { color:var(--muted); font-size:15px; padding:12px 2px; }
+</style>
+</head>
+<body>
+<header>Grocery List<small id="summary"></small></header>
+<main>
+  <section>
+    <h2>Add recipe</h2>
+    <div class="card">
+      <div class="row">
+        <input id="url" type="url" placeholder="Paste TikTok link…" autocomplete="off">
+        <button id="addUrl">Add</button>
+      </div>
+      <details>
+        <summary>Or paste recipe JSON</summary>
+        <div style="margin-top:8px">
+          <textarea id="json" placeholder='{"name":"…","ingredient_groups":[…]}'></textarea>
+          <div style="margin-top:8px"><button id="addJson">Add recipe</button></div>
+        </div>
+      </details>
+      <div id="status"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Recipes</h2>
+    <div id="recipes"></div>
+  </section>
+
+  <section>
+    <h2>Saved recipes</h2>
+    <div id="saved"></div>
+  </section>
+
+  <section>
+    <h2>Pantry staples</h2>
+    <div class="card">
+      <div class="row">
+        <input id="pantryInput" type="text" placeholder="e.g. olive oil" autocomplete="off">
+        <button id="pantryAdd">Add</button>
+      </div>
+      <div id="pantryChips" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px"></div>
+      <div id="pantrySuggest" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px"></div>
+      <div style="font-size:12px; color:var(--muted); margin-top:8px">
+        Staples you always have — they never show up on the list.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="row" style="align-items:baseline">
+      <h2 style="flex:1">What to buy</h2>
+      <button class="ghost" id="shareBtn">share</button>
+      <button class="ghost" id="clearChecked" style="display:none">clear ✓</button>
+    </div>
+    <div id="items"></div>
+  </section>
+</main>
+
+<div id="shareModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:50">
+  <div class="card" style="margin:12% 14px 0; max-width:600px; margin-left:auto; margin-right:auto">
+    <h3 style="margin:0 0 8px">Share list</h3>
+    <textarea id="shareText" readonly style="min-height:230px"></textarea>
+    <div class="row" style="margin-top:8px; justify-content:flex-end">
+      <button class="ghost" id="shareClose">Close</button>
+      <button id="shareCopy">Copy</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const PANTRY_SUGGEST = ['salt', 'pepper', 'olive oil', 'sugar', 'butter', 'flour', 'rice', 'garlic powder'];
+const status = (msg, err) => {
+  const el = $('status'); el.textContent = msg || '';
+  el.className = err ? 'err' : '';
+};
+let STATE = {recipes: [], items: [], saved: [], pantry: []};
+
+async function api(method, path, body) {
+  const r = await fetch(path, {
+    method, headers: {'Content-Type': 'application/json'},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.message || data.error || 'request failed');
+  return data;
+}
+
+function render() {
+  $('summary').textContent =
+    `${STATE.recipes.length} recipe${STATE.recipes.length === 1 ? '' : 's'} · ` +
+    `${STATE.items.length} item${STATE.items.length === 1 ? '' : 's'} to buy`;
+
+  const rc = $('recipes');
+  rc.innerHTML = STATE.recipes.length ? '' : '<div class="empty">No recipes yet.</div>';
+  for (const r of STATE.recipes) {
+    const d = document.createElement('div');
+    d.className = 'card recipe';
+    d.innerHTML = `<div class="row">
+        <span class="name"></span>
+        <button class="ghost savebtn" title="Save recipe">★</button>
+        <button class="danger" title="Remove recipe">✕</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <span class="meta"></span>
+        <span class="stepper scale">
+          <button data-s="-">−</button><span class="sval"></span><button data-s="+">+</button>
+        </span>
+      </div>`;
+    d.querySelector('.name').textContent = r.name || 'Untitled recipe';
+    d.querySelector('.meta').textContent =
+      `${r.ingredient_count} ingredients` + (r.servings ? ` · serves ${r.servings}` : '');
+    const sval = d.querySelector('.sval');
+    const fmtS = s => '×' + (Number.isInteger(s) ? String(s) : s.toFixed(1));
+    sval.textContent = fmtS(r.scale || 1);
+    const setScale = async ns => {
+      STATE = await api('POST', '/api/recipes/' + r.id + '/scale', {scale: ns});
+      render();
+    };
+    const [sminus, splus] = d.querySelectorAll('.scale button');
+    sminus.onclick = () => setScale(Math.max(0.5, Math.round(((r.scale || 1) - 0.5) * 2) / 2));
+    splus.onclick = () => setScale(Math.min(10, Math.round(((r.scale || 1) + 0.5) * 2) / 2));
+    d.querySelector('.danger').onclick = async () => {
+      STATE = await api('DELETE', '/api/recipes/' + r.id); render();
+    };
+    d.querySelector('.savebtn').onclick = async () => {
+      STATE = await api('POST', '/api/saved', {recipe_id: r.id});
+      status('Recipe saved.'); render();
+    };
+    rc.appendChild(d);
+  }
+
+  const sc = $('saved');
+  sc.innerHTML = STATE.saved.length ? '' : '<div class="empty">No saved recipes yet — tap ★ on a recipe to keep it.</div>';
+  for (const r of STATE.saved) {
+    const d = document.createElement('div');
+    d.className = 'card recipe';
+    d.innerHTML = `<div class="row">
+        <span class="name"></span>
+        <span class="meta"></span>
+        <button class="ghost addback">Add to list</button>
+        <button class="danger" title="Delete saved recipe">✕</button>
+      </div>`;
+    d.querySelector('.name').textContent = r.name || 'Untitled recipe';
+    d.querySelector('.meta').textContent =
+      `${r.ingredient_count} ingredients` + (r.servings ? ` · serves ${r.servings}` : '');
+    d.querySelector('.addback').onclick = async () => {
+      STATE = await api('POST', '/api/saved/' + r.id + '/readd'); render();
+    };
+    d.querySelector('.danger').onclick = async () => {
+      STATE = await api('DELETE', '/api/saved/' + r.id); render();
+    };
+    sc.appendChild(d);
+  }
+
+  const pc = $('pantryChips');
+  pc.innerHTML = STATE.pantry.length ? '' : '<span style="color:var(--muted); font-size:14px">None yet.</span>';
+  for (const p of STATE.pantry) {
+    const c = document.createElement('span');
+    c.className = 'chip';
+    c.innerHTML = `<span></span><button title="Remove">✕</button>`;
+    c.querySelector('span').textContent = p;
+    c.querySelector('button').onclick = async () => {
+      STATE = await api('DELETE', '/api/pantry/' + encodeURIComponent(p)); render();
+    };
+    pc.appendChild(c);
+  }
+  const ps = $('pantrySuggest');
+  ps.innerHTML = '';
+  for (const s of PANTRY_SUGGEST.filter(x => !STATE.pantry.includes(x))) {
+    const b = document.createElement('button');
+    b.className = 'suggest'; b.textContent = '+ ' + s;
+    b.onclick = async () => {
+      STATE = await api('POST', '/api/pantry', {name: s}); render();
+    };
+    ps.appendChild(b);
+  }
+
+  const cc = $('clearChecked');
+  const anyChecked = STATE.items.some(i => i.checked);
+  cc.style.display = anyChecked ? '' : 'none';
+  cc.onclick = async () => {
+    STATE = await api('DELETE', '/api/checked'); render();
+  };
+
+  const ic = $('items');
+  ic.innerHTML = STATE.items.length ? '' : '<div class="empty">Your list is empty.</div>';
+  for (const it of STATE.items) {
+    const d = document.createElement('div');
+    d.className = 'card item';
+    const srcNames = [...new Set(it.sources.map(s => s.recipe_name))].join(', ');
+    d.innerHTML = `<div class="row">
+        <input type="checkbox" class="chk" aria-label="mark as bought">
+        <span class="name"></span>
+        <span class="qty"></span>
+        <span class="stepper">
+          <button data-a="-">−</button><button data-a="+">+</button>
+        </span>
+        <button class="ghost" title="Edit quantity">✎</button>
+      </div>
+      <div class="src"></div>
+      <div class="editbox" style="display:none">
+        <input class="q" type="text" inputmode="decimal" placeholder="qty">
+        <input class="u" type="text" placeholder="unit">
+        <button>Save</button>
+        <button class="ghost reset" style="display:none">reset</button>
+      </div>`;
+    d.querySelector('.name').textContent = it.name;
+    if (it.checked) d.classList.add('done');
+    const chk = d.querySelector('.chk');
+    chk.checked = !!it.checked;
+    chk.onchange = async () => {
+      STATE = await api('POST', '/api/items/check', {key: it.key, checked: chk.checked});
+      render();
+    };
+    const q = d.querySelector('.qty');
+    q.textContent = [it.quantity, it.unit].filter(Boolean).join(' ') + (it.more ? '+' : '');
+    if (it.overridden) {
+      const b = document.createElement('span'); b.className = 'badge'; b.textContent = 'edited';
+      q.appendChild(b);
+    }
+    d.querySelector('.src').textContent = 'from: ' + srcNames;
+    const [minus, plus] = d.querySelectorAll('.stepper button');
+    minus.onclick = () => adjust(it.key, -1);
+    plus.onclick = () => adjust(it.key, 1);
+    const box = d.querySelector('.editbox');
+    const qi = box.querySelector('.q'), ui = box.querySelector('.u');
+    d.querySelector('.ghost').onclick = () => {
+      const open = box.style.display !== 'none';
+      box.style.display = open ? 'none' : 'flex';
+      if (!open) { qi.value = it.quantity; ui.value = it.unit; }
+    };
+    box.querySelector('button').onclick = async () => {
+      STATE = await api('POST', '/api/items/adjust',
+        {key: it.key, quantity: qi.value.trim(), unit: ui.value.trim()});
+      render();
+    };
+    const rst = box.querySelector('.reset');
+    if (it.overridden) {
+      rst.style.display = '';
+      rst.onclick = async () => {
+        STATE = await api('DELETE', '/api/overrides/' + encodeURIComponent(it.key));
+        render();
+      };
+    }
+    ic.appendChild(d);
+  }
+}
+
+async function adjust(key, delta) {
+  // step 1 for whole-ish amounts, 0.25 for small fractional amounts
+  STATE = await api('POST', '/api/items/adjust', {key, delta});
+  render();
+}
+
+async function addRecipe(body) {
+  status('Working…');
+  $('addUrl').disabled = true;
+  try {
+    STATE = await api('POST', '/api/recipes', body);
+    status(''); render();
+  } catch (e) {
+    status(e.message, true);
+  } finally { $('addUrl').disabled = false; }
+}
+
+$('addUrl').onclick = () => {
+  const url = $('url').value.trim();
+  if (!url) return status('Paste a TikTok link first.', true);
+  addRecipe({url}); $('url').value = '';
+};
+$('addJson').onclick = () => {
+  try { addRecipe({recipe: JSON.parse($('json').value)}); $('json').value = ''; }
+  catch (e) { status('Invalid JSON: ' + e.message, true); }
+};
+
+const addPantry = async () => {
+  const v = $('pantryInput').value.trim();
+  if (!v) return;
+  STATE = await api('POST', '/api/pantry', {name: v});
+  $('pantryInput').value = ''; render();
+};
+$('pantryAdd').onclick = addPantry;
+$('pantryInput').addEventListener('keydown', e => { if (e.key === 'Enter') addPantry(); });
+
+$('shareBtn').onclick = async () => {
+  const {text} = await api('GET', '/api/share');
+  if (navigator.share) {
+    try { await navigator.share({title: 'Grocery list', text}); } catch (e) {}
+  } else {
+    $('shareText').value = text;
+    $('shareModal').style.display = '';
+  }
+};
+$('shareClose').onclick = () => $('shareModal').style.display = 'none';
+$('shareModal').onclick = e => {
+  if (e.target.id === 'shareModal') $('shareModal').style.display = 'none';
+};
+$('shareCopy').onclick = async () => {
+  const t = $('shareText').value;
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { $('shareText').select(); document.execCommand('copy'); }
+  $('shareModal').style.display = 'none';
+  status('List copied — paste it anywhere.');
+};
+
+(async () => { STATE = await api('GET', '/api/state'); render(); })();
+</script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+*.egg-info/
+
+# App runtime state (created automatically on first run)
+data/
+work/
+
+# Subtitle / transcription artifacts
+*.vtt
+*.srt
+
+# Secrets and local env
+.env
+*.pem
+*.key
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
